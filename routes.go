@@ -6,8 +6,6 @@ import (
 	"github.com/justinas/alice"
 )
 
-// words pulled from here:
-// https://github.com/dwyl/english-words/tree/master
 func (app *application) routes() http.Handler {
 	mux := http.NewServeMux()
 
@@ -17,7 +15,7 @@ func (app *application) routes() http.Handler {
 	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
 
 	mux.Handle("GET /{$}", dynamic.ThenFunc(app.home))
-	mux.Handle("POST /{$}", dynamic.ThenFunc(app.search))
+	mux.Handle("GET /search", dynamic.ThenFunc(app.search))
 
 	// meme endpoint
 	mux.HandleFunc("/teapot", app.teapot)

@@ -3,19 +3,35 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/justinas/nosurf"
 )
 
 func commonHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self' fonts.googleapis.com; font-src fonts.gstatic.com")
+		//nonceBytes := make([]byte, 16)
+		//rand.Read(nonceBytes)
+		//nonce := base64.StdEncoding.EncodeToString(nonceBytes)
+
+		csp := []string{
+			"default-src 'self'",
+			"script-src 'self'",
+			//fmt.Sprintf("style-src 'self' 'nonce-%s", nonce),
+			"style-src 'self'",
+			"connect-src 'self' ws: wss:",
+		}
+
+		w.Header().Set("Content-Security-Policy", strings.Join(csp, "; "))
 		w.Header().Set("Referrer-Policy", "origin-when-cross-origin")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "deny")
 		w.Header().Set("X-XSS-Protection", "0")
 
 		w.Header().Set("Server", "Go")
+
+		//ctx := context.WithValue(r.Context(), cspNonceKey{}, nonce)
+		//next.ServeHTTP(w, r.WithContext(ctx))
 		next.ServeHTTP(w, r)
 	})
 }

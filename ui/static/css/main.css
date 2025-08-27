@@ -10,7 +10,6 @@ body {
     min-height: 100vh;
 }
 
-/* Center the main content */
 main {
     flex: 1;
     display: flex;
@@ -27,7 +26,11 @@ h2 {
     color: #222;
 }
 
-p {
+form { 
+    width: 100%;
+}
+
+input {
     font-size: 1rem;
     color: #666;
 }

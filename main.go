@@ -18,6 +18,8 @@ type application struct {
 	wordTrie *Trie
 }
 
+// words pulled from here:
+// https://github.com/dwyl/english-words/tree/master
 func main() {
 	file, err := os.Open("words.txt")
 	if err != nil {
@@ -52,30 +54,3 @@ func main() {
 		os.Exit(1)
 	}
 }
-
-/*
-	for _, s := range []string{
-		"refoundation",
-		"galravage",
-		"antiproductive",
-		"unctioneer",
-		"Zwinglianist",
-	} {
-		fmt.Println(app.wordTrie.Get(s))
-	}
-
-	walker := func(key string, value any) error {
-		fmt.Println(key)
-		return nil
-	}
-
-	for _, s := range []string{
-		"Zun",
-		"kata",
-		"AAASA",
-	} {
-		app.wordTrie.WalkLeaves(s, walker)
-	}
-
-	time.Sleep(10 * time.Minute)
-*/

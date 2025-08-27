@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <!--
+            <meta name="htmx-config" content='{"inlineStyleNonce": "{{ .CSPNonce }}", "allowScriptTags": false, "allowEval": false}'>
+        -->
+        <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowScriptTags": false, "allowEval": false}'>
+        <title>bored_search</title>
+        <link rel="stylesheet" href="/static/css/main.css">
+        <link rel="shortcut icon" href="/static/img/favicon.ico" type="image/x-icon">
+        <script src="/static/js/htmx.min.js"></script>
+        <script src="/static/js/htmx.ws.min.js"></script>
+    </head>
+    <body hx-ext="ws" ws-connect="/search">
+        <main>
+            <h2>lets find some words</h2>
+            <form id="search" ws-send hx-trigger="keyup changed delay:300ms from:#input">
+                <input id="input" name="input" type="text" placeholder="start typing to find words…">
+            </form>
+            <div id="results" aria-live="polite"></div>
+        </main>
+        <footer>Powered by <a href="https://golang.org/">Go</a>+<a href="https://htmx.org/">HTMX</a></footer>
+    </body>
+</html>
