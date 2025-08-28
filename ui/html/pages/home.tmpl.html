@@ -15,11 +15,21 @@
     <body hx-ext="ws" ws-connect="/search">
         <main> 
             <h2>let’s find some words</h2>
-            <form id="search" ws-send hx-include="[name='input']" hx-trigger="keyup changed delay:300ms from:#input" hx-target="#results" hx-vals='js:{"input": this.querySelector("input").value, "skip": 0}'>
+            <form id="search"
+                ws-send
+                hx-include="[name='input']"
+                hx-trigger="keyup changed delay:300ms from:#input"
+                hx-target="#results"
+                hx-vals='js:{"input": this.querySelector("input").value, "skip": 0}'>
                 <input id="input" name="input" type="text" placeholder="start typing to find words…">
             </form>
             <div id="results" aria-live="polite"></div>
-            <form id="more" ws-send hx-trigger="revealed once" hx-swap="outerHTML" hx-target="#more" hx-vals='{"skip": "50"}'>
+            <form id="more"
+                ws-send
+                hx-trigger="revealed once"
+                hx-swap="outerHTML"
+                hx-target="#more"
+                hx-vals='{"skip": "50"}'>
                 <div class='indicator'>Loading more...</div>
             </form>
         </main>

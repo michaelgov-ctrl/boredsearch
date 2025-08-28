@@ -34,3 +34,28 @@ func checkOrigin(r *http.Request) bool {
 		return false
 	*/
 }
+
+func (app *application) addConn(conn *websocket.Conn) {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+
+	app.connStates[conn] = &ConnState{
+		Input: "",
+		Skip:  0,
+	}
+}
+
+func (app *application) removeConn(conn *websocket.Conn) {
+	conn.Close()
+
+	app.mu.Lock()
+	defer app.mu.Unlock()
+	delete(app.connStates, conn)
+}
+
+func (app *application) getConnState(conn *websocket.Conn) *ConnState {
+	app.mu.Lock()
+	defer app.mu.Unlock()
+
+	return app.connStates[conn]
+}

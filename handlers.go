@@ -33,8 +33,29 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 
 // ConnState holds the state for a single WebSocket connection.
 type ConnState struct {
-	Input string
-	Skip  int
+	Input string `json:"input"`
+	Skip  int    `json:"skip"`
+}
+
+func (cs *ConnState) UnmarshalJSON(b []byte) error {
+	var data struct {
+		Input string `json:"input"`
+		Skip  string `json:"skip"`
+	}
+
+	if err := json.Unmarshal(b, &data); err != nil {
+		return err
+	}
+
+	skip, err := strconv.Atoi(data.Skip)
+	if err != nil {
+		skip = 0
+	}
+
+	cs.Input = data.Input
+	cs.Skip = skip
+
+	return nil
 }
 
 func (app *application) search(w http.ResponseWriter, r *http.Request) {
@@ -44,21 +65,10 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	defer func() {
-		conn.Close()
-		app.mu.Lock()
-		delete(app.connStates, conn)
-		app.mu.Unlock()
-	}()
+	app.addConn(conn)
+	defer app.removeConn(conn)
 
 	const windowSize = 50
-
-	app.mu.Lock()
-	app.connStates[conn] = &ConnState{
-		Input: "",
-		Skip:  0,
-	}
-	app.mu.Unlock()
 
 	for {
 		_, message, err := conn.ReadMessage()
@@ -67,14 +77,9 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var data struct {
-			Input string `json:"input"`
-			Skip  string `json:"skip"`
-		}
-
-		fmt.Println(string(message))
+		var data ConnState
 		if err := json.Unmarshal(message, &data); err != nil {
-			log.Print("unmarshal:", err)
+			app.logger.Error(err.Error())
 			continue
 		}
 
@@ -84,16 +89,13 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 
 		isNewSearch := data.Input != ""
 
-		skip, err := strconv.Atoi(data.Skip)
-		if err != nil {
-			skip = 0
-		}
 		if isNewSearch {
 			state.Input = data.Input
 			state.Skip = 0
 		} else {
-			state.Skip = skip
+			state.Skip = data.Skip
 		}
+
 		if state.Input == "" {
 			continue
 		}
