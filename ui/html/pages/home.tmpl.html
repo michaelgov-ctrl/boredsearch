@@ -13,12 +13,17 @@
         <script src="/static/js/htmx.ws.min.js"></script>
     </head>
     <body hx-ext="ws" ws-connect="/search">
-        <main>
-            <h2>lets find some words</h2>
+        <main> 
+            <h2>let’s find some words</h2>
             <form id="search" ws-send hx-trigger="keyup changed delay:300ms from:#input">
                 <input id="input" name="input" type="text" placeholder="start typing to find words…">
             </form>
             <div id="results" aria-live="polite"></div>
+            <form id="more" ws-send hx-trigger="revealed once" hx-swap="outerHTML">
+                <input type="hidden" name="input" value="">
+                <input type="hidden" name="skip" value="0">
+                <noscript><button>Load more</button></noscript>
+            </form>
         </main>
         <footer>Powered by <a href="https://golang.org/">Go</a>+<a href="https://htmx.org/">HTMX</a></footer>
     </body>

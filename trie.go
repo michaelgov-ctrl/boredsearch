@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"os"
 	"unicode/utf8"
 )
@@ -55,23 +56,24 @@ func (trie *Trie) Get(key string) any {
 // if it replaces an existing value.
 // Note that internal nodes have nil values so a stored nil value will not
 // be distinguishable and will not be included in Walks.
-func (trie *Trie) Put(key string, value any) bool {
-	node := trie
+func (t *Trie) Put(key string, value any) bool {
+	node := t
 	for _, r := range key {
+		if node.children == nil {
+			node.children = make(map[rune]*Trie)
+		}
 		child := node.children[r]
 		if child == nil {
-			if node.children == nil {
-				node.children = map[rune]*Trie{}
-			}
 			child = new(Trie)
 			node.children[r] = child
+
+			node.keys = append(node.keys, r)
 		}
 		node = child
 	}
-	// does node have an existing value?
-	isNewVal := node.value == nil
+	isNew := node.value == nil
 	node.value = value
-	return isNewVal
+	return isNew
 }
 
 // Delete removes the value associated with the given key. Returns true if a
@@ -146,7 +148,8 @@ func (trie *Trie) WalkLeaves(prefix string, walker WalkFunc) error {
 		}
 	}
 
-	for r, child := range node.children {
+	for _, r := range node.keys {
+		child := node.children[r]
 		// +string() could be optimized
 		if err := child.walk(prefix+string(r), walker); err != nil {
 			return err
@@ -194,7 +197,8 @@ func (trie *Trie) walk(key string, walker WalkFunc) error {
 		}
 	}
 
-	for r, child := range trie.children {
+	for _, r := range trie.keys {
+		child := trie.children[r]
 		// +string() could be optimized
 		if err := child.walk(key+string(r), walker); err != nil {
 			return err
@@ -206,4 +210,69 @@ func (trie *Trie) walk(key string, walker WalkFunc) error {
 
 func (trie *Trie) isLeaf() bool {
 	return len(trie.children) == 0
+}
+
+var errPageFull = errors.New("page full")
+
+// WalkLeavesWindow walks leaves under prefix in the order defined by node.keys.
+// It skips the first `skip` leaves, emits up to `window` leaves, and then stops.
+// It returns (emitted, more, err) where `more` is true if additional leaves exist.
+func (t *Trie) WalkLeavesWindow(prefix string, skip, window int, walker WalkFunc) (int, bool, error) {
+	node := t
+	for _, r := range prefix {
+		next, ok := node.children[r]
+		if !ok || next == nil {
+			return 0, false, nil // not found, nothing to walk. consider stepping up the trie & retrying based on popularity
+		}
+		node = next
+	}
+
+	var (
+		path             = []rune(prefix)
+		visited, emitted int
+		more             bool
+	)
+
+	var dfs func(n *Trie) error
+
+	dfs = func(n *Trie) error {
+		if n.value != nil {
+			switch {
+			case visited < skip:
+				visited++
+			case emitted < window:
+				if err := walker(string(path), n.value); err != nil {
+					return err
+				}
+				emitted++
+			default:
+				more = true
+				return errPageFull
+			}
+		}
+
+		for _, r := range n.keys {
+			if emitted >= window {
+				more = true
+				return errPageFull
+			}
+
+			path = append(path, r)
+
+			if err := dfs(n.children[r]); err != nil {
+				return err
+			}
+
+			path = path[:len(path)-1]
+		}
+
+		return nil
+	}
+
+	err := dfs(node)
+	if errors.Is(err, errPageFull) {
+		err = nil
+	}
+
+	return emitted, more, err
 }

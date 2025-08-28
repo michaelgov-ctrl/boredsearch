@@ -52,6 +52,21 @@ input[type="text"]:focus {
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
 }
 
+#results.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px,1fr));
+    gap: .5rem;
+    width: 100%;
+    max-width: 720px;
+    margin: 1rem auto;
+}
+
+.word { padding:.5rem .75rem;
+    background:#fff;
+    border:1px solid #e5e7eb;
+    border-radius:.5rem;
+}
+
 footer {
     text-align: center;
     padding: 1rem;
