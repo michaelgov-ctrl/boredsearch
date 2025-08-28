@@ -53,7 +53,6 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 
 	const windowSize = 50
 
-	// Initialize state for this connection.
 	mu.Lock()
 	connStates[conn] = &ConnState{
 		Input: "",
@@ -89,9 +88,11 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if data.Input != "" {
+			// New search: reset the state
 			state.Input = data.Input
 			state.Skip = 0
 		} else {
+			// Load more: update the skip value
 			state.Skip = skip
 		}
 
@@ -116,12 +117,10 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 
 		if more {
 			moreBuffer.WriteString(fmt.Sprintf(`
-				<form id="more" ws-send hx-trigger="revealed" hx-swap="outerHTML" hx-target="#more">
-					<input type="hidden" name="input" value="%s">
-					<input type="hidden" name="skip" value=%d>
+				<form id="more" ws-send hx-trigger="revealed once" hx-swap="outerHTML" hx-target="#more" hx-vals='{"skip": "%d"}'>
 					<div class='indicator'>Loading more...</div>
 				</form>
-			`, state.Input, state.Skip))
+			`, state.Skip)) // Notice we are sending the updated skip value
 		} else {
 			moreBuffer.WriteString("<div id=\"more\"></div>")
 		}
