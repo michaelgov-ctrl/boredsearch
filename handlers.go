@@ -46,19 +46,19 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 
 	defer func() {
 		conn.Close()
-		mu.Lock()
-		delete(connStates, conn)
-		mu.Unlock()
+		app.mu.Lock()
+		delete(app.connStates, conn)
+		app.mu.Unlock()
 	}()
 
 	const windowSize = 50
 
-	mu.Lock()
-	connStates[conn] = &ConnState{
+	app.mu.Lock()
+	app.connStates[conn] = &ConnState{
 		Input: "",
 		Skip:  0,
 	}
-	mu.Unlock()
+	app.mu.Unlock()
 
 	for {
 		_, message, err := conn.ReadMessage()
@@ -78,13 +78,12 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		mu.Lock()
-		state := connStates[conn]
-		mu.Unlock()
+		app.mu.Lock()
+		state := app.connStates[conn]
+		app.mu.Unlock()
 
 		isNewSearch := data.Input != ""
 
-		// Update state based on request type.
 		skip, err := strconv.Atoi(data.Skip)
 		if err != nil {
 			skip = 0
