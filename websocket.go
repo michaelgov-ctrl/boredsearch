@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/websocket"
 )
@@ -33,6 +35,32 @@ func checkOrigin(r *http.Request) bool {
 
 		return false
 	*/
+}
+
+type ConnState struct {
+	Input string `json:"input"`
+	Skip  int    `json:"skip"`
+}
+
+func (cs *ConnState) UnmarshalJSON(b []byte) error {
+	var data struct {
+		Input string `json:"input"`
+		Skip  string `json:"skip"`
+	}
+
+	if err := json.Unmarshal(b, &data); err != nil {
+		return err
+	}
+
+	skip, err := strconv.Atoi(data.Skip)
+	if err != nil {
+		skip = 0
+	}
+
+	cs.Input = data.Input
+	cs.Skip = skip
+
+	return nil
 }
 
 func (app *application) addConn(conn *websocket.Conn) {
