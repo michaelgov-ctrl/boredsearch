@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -18,6 +19,11 @@ var (
 		"ws://localhost:4040",
 		"http://localhost:4040",
 	}
+
+	// A map to store the state for each connection.
+	// Key: *websocket.Conn, Value: *ConnState
+	connStates = make(map[*websocket.Conn]*ConnState)
+	mu         sync.Mutex // Mutex to protect concurrent access to connStates
 )
 
 // TODO: update this for proxy
