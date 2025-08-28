@@ -82,20 +82,19 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 		state := connStates[conn]
 		mu.Unlock()
 
+		isNewSearch := data.Input != ""
+
+		// Update state based on request type.
 		skip, err := strconv.Atoi(data.Skip)
 		if err != nil {
 			skip = 0
 		}
-
-		if data.Input != "" {
-			// New search: reset the state
+		if isNewSearch {
 			state.Input = data.Input
 			state.Skip = 0
 		} else {
-			// Load more: update the skip value
 			state.Skip = skip
 		}
-
 		if state.Input == "" {
 			continue
 		}
@@ -117,18 +116,26 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 
 		if more {
 			moreBuffer.WriteString(fmt.Sprintf(`
-				<form id="more" ws-send hx-trigger="revealed once" hx-swap="outerHTML" hx-target="#more" hx-vals='{"skip": "%d"}'>
-					<div class='indicator'>Loading more...</div>
-				</form>
-			`, state.Skip)) // Notice we are sending the updated skip value
+                <form id="more" ws-send hx-trigger="revealed once" hx-swap="outerHTML" hx-target="#more" hx-vals='{"skip": "%d"}'>
+                    <div class='indicator'>Loading more...</div>
+                </form>
+            `, state.Skip))
 		} else {
 			moreBuffer.WriteString("<div id=\"more\"></div>")
 		}
 
-		responseHTML := fmt.Sprintf(`
-			<div id="results" hx-swap-oob="innerHTML">%s</div>
-			<div id="more" hx-swap-oob="outerHTML">%s</div>
-		`, resultsBuffer.String(), moreBuffer.String())
+		var responseHTML string
+		if isNewSearch {
+			responseHTML = fmt.Sprintf(`
+                <div id="results" hx-swap-oob="innerHTML">%s</div>
+                <form id="more" hx-swap-oob="outerHTML">%s</form>
+            `, resultsBuffer.String(), moreBuffer.String())
+		} else {
+			responseHTML = fmt.Sprintf(`
+                <div id="results" hx-swap-oob="beforeend">%s</div>
+                <form id="more" hx-swap-oob="outerHTML">%s</form>
+            `, resultsBuffer.String(), moreBuffer.String())
+		}
 
 		if err = conn.WriteMessage(websocket.TextMessage, []byte(responseHTML)); err != nil {
 			log.Print("write:", err)
