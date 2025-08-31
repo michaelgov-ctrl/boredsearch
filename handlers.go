@@ -38,8 +38,9 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	app.addConn(conn)
-	defer app.removeConn(conn)
+	client := NewClient(conn)
+	app.manager.addClient(client)
+	defer app.manager.removeClient(client)
 
 	for {
 		_, message, err := conn.ReadMessage()

@@ -5,10 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"sync"
 	"time"
-
-	"github.com/gorilla/websocket"
 )
 
 type config struct {
@@ -16,11 +13,10 @@ type config struct {
 }
 
 type application struct {
-	config     config
-	logger     *slog.Logger
-	wordTrie   *Trie
-	connStates map[*websocket.Conn]*ConnState
-	mu         sync.Mutex
+	config   config
+	logger   *slog.Logger
+	wordTrie *Trie
+	manager  *Manager
 }
 
 // words pulled from here:
@@ -38,11 +34,10 @@ func main() {
 	}
 
 	app := &application{
-		config:     config{addr: ":4040"},
-		logger:     slog.New(slog.NewTextHandler(os.Stdout, nil)),
-		wordTrie:   trie,
-		connStates: make(map[*websocket.Conn]*ConnState),
-		mu:         sync.Mutex{},
+		config:   config{addr: ":4040"},
+		logger:   slog.New(slog.NewTextHandler(os.Stdout, nil)),
+		wordTrie: trie,
+		manager:  NewManager(),
 	}
 
 	srv := &http.Server{
