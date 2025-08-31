@@ -1,13 +1,9 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
-
-	"github.com/gorilla/websocket"
 )
 
 const windowSize = 50
@@ -32,39 +28,13 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) search(w http.ResponseWriter, r *http.Request) {
-	conn, err := websocketUpgrader.Upgrade(w, r, nil)
+	_, err := websocketUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Print("upgrade:", err)
 		return
 	}
 
-	client := NewClient(conn)
-	app.manager.addClient(client)
-	defer app.manager.removeClient(client)
-
-	for {
-		_, message, err := conn.ReadMessage()
-		if err != nil {
-			log.Print("read:", err)
-			continue
-		}
-
-		var data ConnState
-		if err := json.Unmarshal(message, &data); err != nil {
-			app.logger.Error(err.Error())
-			continue
-		}
-
-		state := app.getConnState(conn)
-		state.Input = data.Input
-
-		isNewSearch := data.Input != ""
-		if isNewSearch {
-			state.Skip = 0
-		} else {
-			state.Skip = data.Skip
-		}
-
+	/*
 		var resultsBuffer bytes.Buffer
 		var moreBuffer bytes.Buffer
 
@@ -85,7 +55,7 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 			app.logger.Error(err.Error())
 			return
 		}
-	}
+	*/
 }
 
 /*

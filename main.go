@@ -13,31 +13,23 @@ type config struct {
 }
 
 type application struct {
-	config   config
-	logger   *slog.Logger
-	wordTrie *Trie
-	manager  *Manager
+	config  config
+	logger  *slog.Logger
+	manager *Manager
 }
 
 // words pulled from here:
 // https://github.com/dwyl/english-words/tree/master
 func main() {
-	file, err := os.Open("words.txt")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	trie, err := NewTrie().LoadFromFile(file)
+	man, err := NewManager()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	app := &application{
-		config:   config{addr: ":4040"},
-		logger:   slog.New(slog.NewTextHandler(os.Stdout, nil)),
-		wordTrie: trie,
-		manager:  NewManager(),
+		config:  config{addr: ":4040"},
+		logger:  slog.New(slog.NewTextHandler(os.Stdout, nil)),
+		manager: man,
 	}
 
 	srv := &http.Server{

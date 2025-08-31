@@ -15,7 +15,7 @@ func (app *application) routes() http.Handler {
 	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
 
 	mux.Handle("GET /{$}", dynamic.ThenFunc(app.home))
-	mux.Handle("GET /search", dynamic.ThenFunc(app.search))
+	mux.Handle("GET /search", dynamic.ThenFunc(app.manager.ServeWS))
 
 	// meme endpoint
 	mux.HandleFunc("/teapot", app.teapot)

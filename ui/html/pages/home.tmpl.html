@@ -16,12 +16,11 @@
         <main> 
             <h2>let’s find some words</h2>
             <form id="search"
+                hx-ext="ws-wrap-payload"
                 ws-send
-                hx-include="[name='input']"
                 hx-trigger="keyup changed delay:300ms from:#input"
-                hx-target="#results"
-                hx-vals='js:{"input": this.querySelector("input").value, "skip": 0}'>
-                <input id="input" name="input" type="text" placeholder="start typing to find words…">
+                hx-target="#results">
+            <input id="input" name="input" type="text" placeholder="start typing to find words…">
             </form>
             <div id="results" aria-live="polite"></div>
             <form id="more"
@@ -34,5 +33,6 @@
             </form>
         </main>
         <footer>Powered by <a href="https://golang.org/">Go</a>+<a href="https://htmx.org/">HTMX</a></footer>
+        <script src="/static/js/ws-wrap-payload.js"></script>
     </body>
 </html>
