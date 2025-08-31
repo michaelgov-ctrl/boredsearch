@@ -37,15 +37,45 @@ func checkOrigin(r *http.Request) bool {
 	*/
 }
 
+type HtmxHeaders struct {
+	CurrentURL  string `json:"HX-Current-URL"`
+	Request     bool   `json:"HX-Request"`
+	Target      string `json:"HX-Target"`
+	Trigger     string `json:"HX-Trigger"`
+	TriggerName string `json:"HX-Trigger-Name"`
+}
+
+func (hh *HtmxHeaders) UnmarshalJSON(b []byte) error {
+	var raw map[string]string
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+
+	hh.CurrentURL = raw["HX-Current-URL"]
+	hh.Target = raw["HX-Target"]
+	hh.Trigger = raw["HX-Trigger"]
+	hh.TriggerName = raw["HX-Trigger-Name"]
+
+	req, err := strconv.ParseBool(raw["HX-Request"])
+	if err != nil {
+		return err
+	}
+	hh.Request = req
+
+	return nil
+}
+
 type ConnState struct {
-	Input string `json:"input"`
-	Skip  int    `json:"skip"`
+	Input   string      `json:"input"`
+	Skip    int         `json:"skip"`
+	Headers HtmxHeaders `json:"HEADERS"`
 }
 
 func (cs *ConnState) UnmarshalJSON(b []byte) error {
 	var data struct {
-		Input string `json:"input"`
-		Skip  string `json:"skip"`
+		Input   string      `json:"input"`
+		Skip    string      `json:"skip"`
+		Headers HtmxHeaders `json:"HEADERS"`
 	}
 
 	if err := json.Unmarshal(b, &data); err != nil {
@@ -59,6 +89,7 @@ func (cs *ConnState) UnmarshalJSON(b []byte) error {
 
 	cs.Input = data.Input
 	cs.Skip = skip
+	cs.Headers = data.Headers
 
 	return nil
 }

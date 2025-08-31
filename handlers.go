@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"log"
 	"net/http"
@@ -53,6 +54,7 @@ func (app *application) search(w http.ResponseWriter, r *http.Request) {
 			app.logger.Error(err.Error())
 			continue
 		}
+		fmt.Println(data)
 
 		state := app.getConnState(conn)
 		state.Input = data.Input
