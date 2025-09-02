@@ -1,15 +1,19 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
+
+const windowSize = 50
 
 type Client struct {
 	conn    *websocket.Conn
@@ -25,12 +29,13 @@ func NewClient(conn *websocket.Conn, m *Manager) *Client {
 		conn:    conn,
 		manager: m,
 		egress:  make(chan []byte),
-		buffer:  make(chan string, 50),
+		buffer:  make(chan string, windowSize),
 		reset:   make(chan struct{}),
 		once:    ResettableOnce{},
 	}
 
 	go c.manager.search("", c)
+	go c.writeLeaves("")
 
 	return c
 }
@@ -119,6 +124,39 @@ func (c *Client) writeEvents() {
 
 func (c *Client) pongHandler(pongMsg string) error {
 	return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+}
+
+func (c *Client) writeLeaves(prefix string) {
+	var (
+		buf bytes.Buffer
+		i   int
+	)
+
+	for i < windowSize { // TODO: less than window size
+		s := <-c.buffer
+		if !strings.HasPrefix(s, prefix) { // naively drain channel till i think of something better
+			continue
+		}
+
+		buf.WriteString(fmt.Sprintf(
+			"<div class='item'>%s</div>\n", s,
+		))
+		i++
+	}
+
+	html := fmt.Sprintf("<div id=\"results\" hx-swap-oob=\"innerHTML\">%s</div>\n", buf.String())
+
+	if i == windowSize {
+		html += `
+				<form id="more" ws-send hx-trigger="revealed once" hx-swap="outerHTML" hx-target="#more"'>
+					<div class='indicator'>Loading more...</div>
+				</form>
+				`
+	} else {
+		html += "<div id=\"more\"></div>"
+	}
+
+	c.egress <- []byte(html)
 }
 
 type ResettableOnce struct {

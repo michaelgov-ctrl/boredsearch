@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -98,37 +97,24 @@ func (m *Manager) searchHandler(event Event, c *Client) error {
 		return fmt.Errorf("bad payload in request: %v", err)
 	}
 
-	fmt.Println("received search event\n", searchEvent)
-
 	go func() {
 		c.reset <- struct{}{}
 		m.search(searchEvent.Input, c)
 	}()
 
-	var buf bytes.Buffer
-	i := 0
-	for i < 50 { // TODO: less than windows size
-		str := <-c.buffer
-		buf.WriteString(fmt.Sprintf(
-			`<div id="results" hx-swap-oob="innerHTML">%s</div>`, str,
-		))
-		i++
-	}
-	if i < 49 {
-		// no more
-	}
-	// form first html chunk
+	c.writeLeaves(searchEvent.Input)
 
-	c.egress <- buf.Bytes()
-	// write it to egress
 	return nil
 }
 
 func (m *Manager) search(str string, c *Client) {
+	defer func() {
+		c.buffer = make(chan string)
+		c.once.Reset()
+	}()
+
 	if err := c.manager.wordTrie.WalkLeaves(str, c.trieWalker); err != nil {
 		if errors.Is(err, errWalkReset) {
-			c.buffer = make(chan string)
-			c.once.Reset()
 			return
 		}
 		log.Printf("error for: %v, error: %v", &c, err)
@@ -136,10 +122,6 @@ func (m *Manager) search(str string, c *Client) {
 }
 
 func (m *Manager) moreHandler(event Event, c *Client) error {
-	// get x out of buffer
-
-	// form html chunk
-
-	// write it to egress
+	c.writeLeaves("")
 	return nil
 }

@@ -24,11 +24,12 @@
             </form>
             <div id="results" aria-live="polite"></div>
             <form id="more"
+                hx-ext="ws-wrap-payload"
                 ws-send
                 hx-trigger="revealed once"
                 hx-swap="outerHTML"
                 hx-target="#more"
-                hx-vals='{"skip": "50"}'>
+                hx-include="#input">
                 <div class='indicator'>Loading more...</div>
             </form>
         </main>
