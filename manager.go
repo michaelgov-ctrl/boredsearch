@@ -100,8 +100,10 @@ func (m *Manager) searchHandler(event Event, c *Client) error {
 
 	fmt.Println("received search event\n", searchEvent)
 
-	c.reset <- struct{}{}
-	m.search("", c)
+	go func() {
+		c.reset <- struct{}{}
+		m.search(searchEvent.Input, c)
+	}()
 
 	var buf bytes.Buffer
 	i := 0
