@@ -14,6 +14,8 @@ import (
 
 const windowSize = 50
 
+var errWalkReset = errors.New("walk reset")
+
 type Client struct {
 	conn    *websocket.Conn
 	manager *Manager
@@ -21,6 +23,7 @@ type Client struct {
 	buffer  chan string
 	reset   chan struct{}
 	once    ResettableOnce
+	mu      sync.Mutex
 }
 
 func NewClient(conn *websocket.Conn, m *Manager) *Client {
@@ -37,21 +40,6 @@ func NewClient(conn *websocket.Conn, m *Manager) *Client {
 	go c.sendSearchHTML("")
 
 	return c
-}
-
-var errWalkReset = errors.New("walk reset")
-
-func (c *Client) trieWalker(key string, value any) error {
-	fmt.Println(key)
-	select {
-	case <-c.reset:
-		c.once.Do(func() {
-			close(c.buffer)
-		})
-		return errWalkReset
-	case c.buffer <- key:
-		return nil
-	}
 }
 
 func (c *Client) readEvents() {
@@ -125,10 +113,26 @@ func (c *Client) pongHandler(pongMsg string) error {
 	return c.conn.SetReadDeadline(time.Now().Add(pongWait))
 }
 
+func (c *Client) trieWalker(key string, value any) error {
+	//fmt.Println(key)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	select {
+	case <-c.reset:
+		//c.once.Do(func() {
+		close(c.buffer)
+		//})
+		return errWalkReset
+	case c.buffer <- key:
+		return nil
+	}
+}
+
 func (c *Client) collectLeaves(prefix string) []string {
 	var words []string
 
-	for range windowSize {
+	for i := 0; i < windowSize; {
 		s := <-c.buffer
 		if !strings.HasPrefix(s, prefix) { // naively drain channel till i think of something better
 			continue
@@ -137,6 +141,8 @@ func (c *Client) collectLeaves(prefix string) []string {
 		words = append(words, fmt.Sprintf(
 			"<div class='item'>%s</div>", s,
 		))
+
+		i++
 	}
 
 	return words
@@ -147,6 +153,7 @@ func (c *Client) sendSearchHTML(prefix string) {
 	wordsBlock := strings.Join(words, "\n")
 	html := fmt.Sprintf("<div id=\"results\" hx-swap-oob=\"innerHTML\">%s</div>\n", wordsBlock)
 
+	fmt.Println(len(words))
 	if len(words) == windowSize {
 		html += `
 				<form id="more" ws-send hx-trigger="revealed once" hx-swap="outerHTML" hx-target="#more"'>
@@ -176,6 +183,13 @@ func (c *Client) sendMoreHTML() {
 	}
 
 	c.egress <- []byte(html)
+}
+
+func (c *Client) ResetBuffer() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.buffer = make(chan string)
+	c.once.Reset()
 }
 
 type ResettableOnce struct {

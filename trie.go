@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"errors"
 	"os"
 	"unicode/utf8"
 )
@@ -11,6 +10,8 @@ import (
 	much of this is pulled from:
 	https://github.com/dghubble/trie/blob/main/rune_trie.go
 */
+
+// var errEndOfTrie = errors.New("end of")
 
 // Trie is a trie of runes with string keys and any values.
 // Note that internal nodes have nil values so a stored nil value will not
@@ -210,69 +211,4 @@ func (trie *Trie) walk(key string, walker WalkFunc) error {
 
 func (trie *Trie) isLeaf() bool {
 	return len(trie.children) == 0
-}
-
-var errPageFull = errors.New("page full")
-
-// WalkLeavesWindow walks leaves under prefix in the order defined by node.keys.
-// It skips the first `skip` leaves, emits up to `window` leaves, and then stops.
-// It returns (emitted, more, err) where `more` is true if additional leaves exist.
-func (t *Trie) WalkLeavesWindow(prefix string, skip, window int, walker WalkFunc) (int, bool, error) {
-	node := t
-	for _, r := range prefix {
-		next, ok := node.children[r]
-		if !ok || next == nil {
-			return 0, false, nil // not found, nothing to walk. consider stepping up the trie & retrying based on popularity
-		}
-		node = next
-	}
-
-	var (
-		path             = []rune(prefix)
-		visited, emitted int
-		more             bool
-	)
-
-	var dfs func(n *Trie) error
-
-	dfs = func(n *Trie) error {
-		if n.value != nil {
-			switch {
-			case visited < skip:
-				visited++
-			case emitted < window:
-				if err := walker(string(path), n.value); err != nil {
-					return err
-				}
-				emitted++
-			default:
-				more = true
-				return errPageFull
-			}
-		}
-
-		for _, r := range n.keys {
-			if emitted >= window {
-				more = true
-				return errPageFull
-			}
-
-			path = append(path, r)
-
-			if err := dfs(n.children[r]); err != nil {
-				return err
-			}
-
-			path = path[:len(path)-1]
-		}
-
-		return nil
-	}
-
-	err := dfs(node)
-	if errors.Is(err, errPageFull) {
-		err = nil
-	}
-
-	return emitted, more, err
 }

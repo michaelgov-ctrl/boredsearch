@@ -108,10 +108,11 @@ func (m *Manager) searchHandler(event Event, c *Client) error {
 }
 
 func (m *Manager) search(str string, c *Client) {
-	defer func() {
+	defer c.ResetBuffer() /*func() {
+		//close(c.buffer)
 		c.buffer = make(chan string)
 		c.once.Reset()
-	}()
+	}()*/
 
 	if err := c.manager.wordTrie.WalkLeaves(str, c.trieWalker); err != nil {
 		if errors.Is(err, errWalkReset) {
