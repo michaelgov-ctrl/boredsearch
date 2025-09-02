@@ -102,7 +102,7 @@ func (m *Manager) searchHandler(event Event, c *Client) error {
 		m.search(searchEvent.Input, c)
 	}()
 
-	c.writeLeaves(searchEvent.Input)
+	c.sendSearchHTML(searchEvent.Input)
 
 	return nil
 }
@@ -122,6 +122,6 @@ func (m *Manager) search(str string, c *Client) {
 }
 
 func (m *Manager) moreHandler(event Event, c *Client) error {
-	c.writeLeaves("")
+	c.sendMoreHTML()
 	return nil
 }

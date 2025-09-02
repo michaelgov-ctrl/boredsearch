@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,7 +34,7 @@ func NewClient(conn *websocket.Conn, m *Manager) *Client {
 	}
 
 	go c.manager.search("", c)
-	go c.writeLeaves("")
+	go c.sendSearchHTML("")
 
 	return c
 }
@@ -126,27 +125,47 @@ func (c *Client) pongHandler(pongMsg string) error {
 	return c.conn.SetReadDeadline(time.Now().Add(pongWait))
 }
 
-func (c *Client) writeLeaves(prefix string) {
-	var (
-		buf bytes.Buffer
-		i   int
-	)
+func (c *Client) collectLeaves(prefix string) []string {
+	var words []string
 
-	for i < windowSize { // TODO: less than window size
+	for range windowSize {
 		s := <-c.buffer
 		if !strings.HasPrefix(s, prefix) { // naively drain channel till i think of something better
 			continue
 		}
 
-		buf.WriteString(fmt.Sprintf(
-			"<div class='item'>%s</div>\n", s,
+		words = append(words, fmt.Sprintf(
+			"<div class='item'>%s</div>", s,
 		))
-		i++
 	}
 
-	html := fmt.Sprintf("<div id=\"results\" hx-swap-oob=\"innerHTML\">%s</div>\n", buf.String())
+	return words
+}
 
-	if i == windowSize {
+func (c *Client) sendSearchHTML(prefix string) {
+	words := c.collectLeaves(prefix)
+	wordsBlock := strings.Join(words, "\n")
+	html := fmt.Sprintf("<div id=\"results\" hx-swap-oob=\"innerHTML\">%s</div>\n", wordsBlock)
+
+	if len(words) == windowSize {
+		html += `
+				<form id="more" ws-send hx-trigger="revealed once" hx-swap="outerHTML" hx-target="#more"'>
+					<div class='indicator'>Loading more...</div>
+				</form>
+				`
+	} else {
+		html += "<div id=\"more\"></div>"
+	}
+
+	c.egress <- []byte(html)
+}
+
+func (c *Client) sendMoreHTML() {
+	words := c.collectLeaves("")
+	wordsBlock := strings.Join(words, "\n")
+	html := fmt.Sprintf("<div id=\"results\" hx-swap-oob=\"beforeend\">%s</div>\n", wordsBlock)
+
+	if len(words) == windowSize {
 		html += `
 				<form id="more" ws-send hx-trigger="revealed once" hx-swap="outerHTML" hx-target="#more"'>
 					<div class='indicator'>Loading more...</div>
