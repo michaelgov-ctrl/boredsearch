@@ -100,24 +100,33 @@ func (m *Manager) searchHandler(event Event, c *Client) error {
 
 	fmt.Println("received search event\n", searchEvent)
 
-	go m.search("", c)
+	c.reset <- struct{}{}
+	m.search("", c)
 
 	var buf bytes.Buffer
-	for i := 0; i < 50; i++ { // TODO: less than windows size
-
+	i := 0
+	for i < 50 { // TODO: less than windows size
+		str := <-c.buffer
+		buf.WriteString(fmt.Sprintf(
+			`<div id="results" hx-swap-oob="innerHTML">%s</div>`, str,
+		))
+		i++
+	}
+	if i < 49 {
+		// no more
 	}
 	// form first html chunk
 
+	c.egress <- buf.Bytes()
 	// write it to egress
 	return nil
 }
 
 func (m *Manager) search(str string, c *Client) {
-	c.reset <- struct{}{}
 	if err := c.manager.wordTrie.WalkLeaves(str, c.trieWalker); err != nil {
 		if errors.Is(err, errWalkReset) {
-			// is this race concerning?
-			c.buffer = make(chan<- string)
+			c.buffer = make(chan string)
+			c.once.Reset()
 			return
 		}
 		log.Printf("error for: %v, error: %v", &c, err)

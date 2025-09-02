@@ -3,7 +3,9 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -13,8 +15,9 @@ type Client struct {
 	conn    *websocket.Conn
 	manager *Manager
 	egress  chan []byte
-	buffer  chan<- string
+	buffer  chan string
 	reset   chan struct{}
+	once    ResettableOnce
 }
 
 func NewClient(conn *websocket.Conn, m *Manager) *Client {
@@ -22,9 +25,12 @@ func NewClient(conn *websocket.Conn, m *Manager) *Client {
 		conn:    conn,
 		manager: m,
 		egress:  make(chan []byte),
-		buffer:  make(chan<- string),
+		buffer:  make(chan string, 50),
 		reset:   make(chan struct{}),
+		once:    ResettableOnce{},
 	}
+
+	go c.manager.search("", c)
 
 	return c
 }
@@ -32,15 +38,16 @@ func NewClient(conn *websocket.Conn, m *Manager) *Client {
 var errWalkReset = errors.New("walk reset")
 
 func (c *Client) trieWalker(key string, value any) error {
-	_, ok := <-c.reset
-	if ok {
-		// is this race concerning?
-		close(c.buffer)
+	fmt.Println(key)
+	select {
+	case <-c.reset:
+		c.once.Do(func() {
+			close(c.buffer)
+		})
 		return errWalkReset
+	case c.buffer <- key:
+		return nil
 	}
-
-	c.buffer <- key
-	return nil
 }
 
 func (c *Client) readEvents() {
@@ -112,4 +119,24 @@ func (c *Client) writeEvents() {
 
 func (c *Client) pongHandler(pongMsg string) error {
 	return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+}
+
+type ResettableOnce struct {
+	mu   sync.Mutex
+	done bool
+}
+
+func (o *ResettableOnce) Do(f func()) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if !o.done {
+		f()
+		o.done = true
+	}
+}
+
+func (o *ResettableOnce) Reset() {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	o.done = false
 }
