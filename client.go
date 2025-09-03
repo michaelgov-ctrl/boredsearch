@@ -37,7 +37,7 @@ func NewClient(conn *websocket.Conn, m *Manager) *Client {
 	}
 
 	go c.manager.search("", c)
-	go c.sendSearchHTML("")
+	go c.sendHTML("", Search)
 
 	return c
 }
@@ -149,34 +149,28 @@ func (c *Client) collectLeaves(prefix string) []string {
 	return words
 }
 
-func (c *Client) sendSearchHTML(prefix string) {
-	words := c.collectLeaves(prefix)
-	wordsBlock := strings.Join(words, "\n")
-	html := fmt.Sprintf("<div id=\"results\" hx-swap-oob=\"innerHTML\">%s</div>\n", wordsBlock)
+type HtmxOob int
 
-	if len(words) == windowSize {
-		html += `
-				<form id="more"
-					hx-ext="ws-wrap-payload"
-					ws-send
-					hx-trigger="revealed once"
-					hx-swap="outerHTML"
-					hx-target="#more"
-					hx-include="#input">
-					<div class='indicator'>Loading more...</div>
-				</form>
-				`
-	} else {
-		html += "<div id=\"more\"></div>"
+const (
+	Search HtmxOob = iota
+	More
+)
+
+func (ho HtmxOob) String() string {
+	switch ho {
+	case Search:
+		return "innerHTML"
+	case More:
+		return "beforeend"
+	default:
+		return fmt.Sprintf("unknown state (%d)", ho)
 	}
-
-	c.egress <- []byte(html)
 }
 
-func (c *Client) sendMoreHTML() {
-	words := c.collectLeaves("")
+func (c *Client) sendHTML(prefix string, ho HtmxOob) {
+	words := c.collectLeaves(prefix)
 	wordsBlock := strings.Join(words, "\n")
-	html := fmt.Sprintf("<div id=\"results\" hx-swap-oob=\"beforeend\">%s</div>\n", wordsBlock)
+	html := fmt.Sprintf("<div id=\"results\" hx-swap-oob=\"%s\">%s</div>\n", ho, wordsBlock)
 
 	if len(words) == windowSize {
 		html += `
@@ -198,18 +192,13 @@ func (c *Client) sendMoreHTML() {
 }
 
 func (c *Client) CloseBuffer() {
-	//c.mu.Lock()
-	//defer c.mu.Unlock()
-	//c.once.Do(func() {
 	close(c.buffer)
-	//})
 }
 
 func (c *Client) ResetBuffer() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.buffer = make(chan string)
-	//c.once.Reset()
 }
 
 type ResettableOnce struct {

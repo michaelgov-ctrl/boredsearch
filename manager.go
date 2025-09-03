@@ -102,7 +102,7 @@ func (m *Manager) searchHandler(event Event, c *Client) error {
 		m.search(searchEvent.Input, c)
 	}()
 
-	c.sendSearchHTML(searchEvent.Input)
+	c.sendHTML(searchEvent.Input, Search)
 
 	return nil
 }
@@ -119,13 +119,11 @@ func (m *Manager) search(str string, c *Client) {
 }
 
 func (m *Manager) moreHandler(event Event, c *Client) error {
-	/*
-		var searchEvent SearchEvent
-		if err := json.Unmarshal(event.Payload, &searchEvent); err != nil {
-			return fmt.Errorf("bad payload in request: %v", err)
-		}*/
-	fmt.Println(string(event.Payload))
+	var moreEvent MoreEvent
+	if err := json.Unmarshal(event.Payload, &moreEvent); err != nil {
+		return fmt.Errorf("bad payload in request: %v", err)
+	}
 
-	c.sendMoreHTML()
+	c.sendHTML(moreEvent.Input, More)
 	return nil
 }
