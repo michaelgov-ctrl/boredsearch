@@ -147,7 +147,7 @@ func (c *Client) collectLeaves() []string {
 			break
 		}
 
-		words = append(words, fmt.Sprintf("<div class='item'>%s</div>", s))
+		words = append(words, fmt.Sprintf(`<div class='word'>%s</div>`, s))
 	}
 
 	return words
