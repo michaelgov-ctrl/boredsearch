@@ -1,10 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"sync"
@@ -15,9 +16,13 @@ type Manager struct {
 	mu       sync.RWMutex
 	handlers map[string]EventHandler
 	wordTrie *Trie
+	logger   *slog.Logger
 }
 
-func NewManager() (*Manager, error) {
+// words pulled from here:
+// https://github.com/dwyl/english-words/tree/master
+
+func NewManager(logger *slog.Logger) (*Manager, error) {
 	file, err := os.Open("words.txt")
 	if err != nil {
 		return nil, err
@@ -34,6 +39,7 @@ func NewManager() (*Manager, error) {
 		mu:       sync.RWMutex{},
 		handlers: make(map[string]EventHandler),
 		wordTrie: trie,
+		logger:   logger,
 	}
 
 	m.registerEventHandlers()
@@ -44,7 +50,7 @@ func NewManager() (*Manager, error) {
 func (m *Manager) ServeWS(w http.ResponseWriter, r *http.Request) {
 	conn, err := websocketUpgrader.Upgrade(w, r, nil)
 	if err != nil {
-		log.Print("upgrade:", err)
+		m.logger.Debug(fmt.Sprintf("upgrade: %v", err))
 		return
 	}
 
@@ -77,7 +83,7 @@ func (m *Manager) registerEventHandlers() {
 }
 
 func (m *Manager) routeEvent(event Event, c *Client) error {
-	log.Println(event.Headers.Trigger)
+	m.logger.Debug(fmt.Sprintf("routing event: %s", event.Headers.Trigger))
 
 	handler, ok := m.handlers[event.Headers.Trigger]
 	if !ok {
@@ -96,34 +102,28 @@ func (m *Manager) searchHandler(event Event, c *Client) error {
 	if err := json.Unmarshal(event.Payload, &searchEvent); err != nil {
 		return fmt.Errorf("bad payload in request: %v", err)
 	}
-
-	go func() {
-		c.reset <- struct{}{}
-		m.search(searchEvent.Input, c)
-	}()
-
-	c.sendHTML(searchEvent.Input, Search)
-
+	c.startSearch(searchEvent.Input)
 	return nil
 }
 
-func (m *Manager) search(str string, c *Client) {
-	defer c.ResetBuffer()
+func (m *Manager) searchWithCtx(ctx context.Context, prefix string, out chan<- string) {
+	defer close(out)
 
-	if err := c.manager.wordTrie.WalkLeaves(str, c.trieWalker); err != nil {
-		if errors.Is(err, errWalkReset) {
-			return
+	walker := func(key string, _ any) error {
+		select {
+		case <-ctx.Done():
+			return context.Canceled
+		case out <- key:
+			return nil
 		}
-		log.Printf("error for: %v, error: %v", &c, err)
+	}
+
+	if err := m.wordTrie.WalkLeaves(prefix, walker); err != nil && !errors.Is(err, context.Canceled) {
+		m.logger.Error(err.Error())
 	}
 }
 
 func (m *Manager) moreHandler(event Event, c *Client) error {
-	var moreEvent MoreEvent
-	if err := json.Unmarshal(event.Payload, &moreEvent); err != nil {
-		return fmt.Errorf("bad payload in request: %v", err)
-	}
-
-	c.sendHTML(moreEvent.Input, More)
+	c.sendHTML(More)
 	return nil
 }

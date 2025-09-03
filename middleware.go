@@ -10,14 +10,9 @@ import (
 
 func commonHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		//nonceBytes := make([]byte, 16)
-		//rand.Read(nonceBytes)
-		//nonce := base64.StdEncoding.EncodeToString(nonceBytes)
-
 		csp := []string{
 			"default-src 'self'",
 			"script-src 'self'",
-			//fmt.Sprintf("style-src 'self' 'nonce-%s", nonce),
 			"style-src 'self'",
 			"connect-src 'self' ws: wss:",
 		}
@@ -30,8 +25,6 @@ func commonHeaders(next http.Handler) http.Handler {
 
 		w.Header().Set("Server", "Go")
 
-		//ctx := context.WithValue(r.Context(), cspNonceKey{}, nonce)
-		//next.ServeHTTP(w, r.WithContext(ctx))
 		next.ServeHTTP(w, r)
 	})
 }
@@ -74,46 +67,3 @@ func noSurf(next http.Handler) http.Handler {
 
 	return csrfHandler
 }
-
-/*
-func wsSearch(getStream func(ctx context.Context) <-chan string) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := websocketUpgrader.Upgrade(w, r, nil)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		defer conn.Close()
-
-		ctx, cancel := context.WithCancel(r.Context())
-		defer cancel()
-
-		wordChan := getStream(ctx)
-
-		sendPageFromChan(ctx, conn, wordChan)
-
-		for {
-			// HTMX ws-send sends JSON containing your form fields + HEADERS.
-			// We only care about "action" and "cursor" here. :contentReference[oaicite:1]{index=1}
-			_, msg, err := conn.ReadMessage()
-			if err != nil {
-				return
-			}
-			var body map[string]any
-			if err := json.Unmarshal(msg, &body); err != nil {
-				log.Println("bad json:", err)
-				continue
-			}
-			// We ignore cursor when streaming from a channel; the stream
-			// position advances as we read. Just look for action=next.
-			action := fmt.Sprint(body["action"])
-			if action == "" {
-				action = "next"
-			}
-			if action == "next" {
-				sendPageFromChan(ctx, conn, wordChan)
-			}
-		}
-	})
-}
-*/

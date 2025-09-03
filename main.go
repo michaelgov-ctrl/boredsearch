@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -18,19 +17,19 @@ type application struct {
 	manager *Manager
 }
 
-// words pulled from here:
-// https://github.com/dwyl/english-words/tree/master
 func main() {
-	man, err := NewManager()
-	if err != nil {
-		log.Fatal(err)
+	app := &application{
+		config: config{addr: ":4040"},
+		logger: slog.New(slog.NewTextHandler(os.Stdout, nil)),
 	}
 
-	app := &application{
-		config:  config{addr: ":4040"},
-		logger:  slog.New(slog.NewTextHandler(os.Stdout, nil)),
-		manager: man,
+	man, err := NewManager(app.logger)
+	if err != nil {
+		app.logger.Error(err.Error())
+		os.Exit(1)
 	}
+
+	app.manager = man
 
 	srv := &http.Server{
 		Addr:         app.config.addr,

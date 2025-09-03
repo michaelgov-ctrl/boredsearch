@@ -1,10 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -14,32 +13,52 @@ import (
 
 const windowSize = 50
 
-var errWalkReset = errors.New("walk reset")
+type mailbox struct {
+	ctx    context.Context
+	cancel context.CancelFunc
+	ch     chan string
+}
 
 type Client struct {
 	conn    *websocket.Conn
 	manager *Manager
 	egress  chan []byte
-	buffer  chan string
-	reset   chan struct{}
-	once    ResettableOnce
 	mu      sync.Mutex
+	active  *mailbox
 }
 
 func NewClient(conn *websocket.Conn, m *Manager) *Client {
 	c := &Client{
 		conn:    conn,
 		manager: m,
-		egress:  make(chan []byte),
-		buffer:  make(chan string, windowSize),
-		reset:   make(chan struct{}),
-		once:    ResettableOnce{},
+		egress:  make(chan []byte, 8),
 	}
 
-	go c.manager.search("", c)
-	go c.sendHTML("", Search)
+	c.startSearch("")
 
 	return c
+}
+
+func (c *Client) setMailbox() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.active != nil {
+		c.active.cancel()
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	c.active = &mailbox{
+		ctx:    ctx,
+		cancel: cancel,
+		ch:     make(chan string, windowSize),
+	}
+}
+
+func (c *Client) startSearch(input string) {
+	c.setMailbox()
+	go c.manager.searchWithCtx(c.active.ctx, input, c.active.ch)
+	c.sendHTML(Search)
 }
 
 func (c *Client) readEvents() {
@@ -48,7 +67,7 @@ func (c *Client) readEvents() {
 	}()
 
 	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
-		log.Println(err)
+		c.manager.logger.Error(err.Error())
 		return
 	}
 
@@ -59,19 +78,19 @@ func (c *Client) readEvents() {
 		_, payload, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				log.Println(err)
+				c.manager.logger.Error(err.Error())
 			}
 			break
 		}
 
 		var req Event
 		if err := json.Unmarshal(payload, &req); err != nil {
-			log.Println(err)
+			c.manager.logger.Error(err.Error())
 			break
 		}
 
 		if err := c.manager.routeEvent(req, c); err != nil {
-			log.Println(err)
+			c.manager.logger.Error(err.Error())
 			c.egress <- []byte(err.Error())
 		}
 	}
@@ -91,18 +110,18 @@ func (c *Client) writeEvents() {
 			if !ok {
 				// if egress is broken notify client & close
 				if err := c.conn.WriteMessage(websocket.CloseMessage, nil); err != nil {
-					log.Println(err)
+					c.manager.logger.Error(err.Error())
 				}
 				return
 			}
 
 			if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
-				log.Println(err)
+				c.manager.logger.Error(err.Error())
 				return
 			}
 		case <-ticker.C:
 			if err := c.conn.WriteMessage(websocket.PingMessage, []byte(``)); err != nil {
-				log.Println(err)
+				c.manager.logger.Error(err.Error())
 				return
 			}
 		}
@@ -113,37 +132,22 @@ func (c *Client) pongHandler(pongMsg string) error {
 	return c.conn.SetReadDeadline(time.Now().Add(pongWait))
 }
 
-func (c *Client) trieWalker(key string, value any) error {
-	//fmt.Println(key)
+func (c *Client) collectLeaves() []string {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	select {
-	case <-c.reset:
-		//c.once.Do(func() {
-		//close(c.buffer)
-		//})
-		c.CloseBuffer()
-		return errWalkReset
-	case c.buffer <- key:
+	mb := c.active
+	c.mu.Unlock()
+	if mb == nil {
 		return nil
 	}
-}
 
-func (c *Client) collectLeaves(prefix string) []string {
 	var words []string
-
-	for i := 0; i < windowSize; {
-		s := <-c.buffer
-		if !strings.HasPrefix(s, prefix) { // naively drain channel till i think of something better
-			continue
+	for len(words) < windowSize {
+		s, ok := <-mb.ch
+		if !ok {
+			break
 		}
 
-		words = append(words, fmt.Sprintf(
-			"<div class='item'>%s</div>", s,
-		))
-
-		i++
+		words = append(words, fmt.Sprintf("<div class='item'>%s</div>", s))
 	}
 
 	return words
@@ -167,8 +171,8 @@ func (ho HtmxOob) String() string {
 	}
 }
 
-func (c *Client) sendHTML(prefix string, ho HtmxOob) {
-	words := c.collectLeaves(prefix)
+func (c *Client) sendHTML(ho HtmxOob) {
+	words := c.collectLeaves()
 	wordsBlock := strings.Join(words, "\n")
 	html := fmt.Sprintf("<div id=\"results\" hx-swap-oob=\"%s\">%s</div>\n", ho, wordsBlock)
 
@@ -185,38 +189,8 @@ func (c *Client) sendHTML(prefix string, ho HtmxOob) {
 				</form>
 				`
 	} else {
-		html += "<div id=\"more\"></div>"
+		html += `<div id="more"></div>`
 	}
 
 	c.egress <- []byte(html)
-}
-
-func (c *Client) CloseBuffer() {
-	close(c.buffer)
-}
-
-func (c *Client) ResetBuffer() {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.buffer = make(chan string)
-}
-
-type ResettableOnce struct {
-	mu   sync.Mutex
-	done bool
-}
-
-func (o *ResettableOnce) Do(f func()) {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	if !o.done {
-		f()
-		o.done = true
-	}
-}
-
-func (o *ResettableOnce) Reset() {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-	o.done = false
 }
