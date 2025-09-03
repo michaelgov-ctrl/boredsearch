@@ -1,4 +1,4 @@
-package main
+package trie
 
 import (
 	"bufio"
@@ -18,7 +18,7 @@ import (
 // be distinguishable and will not be included in Walks.
 type Trie struct {
 	value    any
-	keys     []rune // TODO: on insert add keys for each node to use for ordered retrieval in walk()
+	keys     []rune
 	children map[rune]*Trie
 }
 
@@ -27,7 +27,16 @@ func NewTrie() *Trie {
 	return new(Trie)
 }
 
-func (t *Trie) LoadFromFile(file *os.File) (*Trie, error) {
+// words pulled from here:
+// https://github.com/dwyl/english-words/tree/master
+
+func (t *Trie) LoadFromFile() (*Trie, error) {
+	file, err := os.Open("trie/words.txt")
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		t.Put(scanner.Text(), 1)

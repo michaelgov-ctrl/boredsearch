@@ -1,4 +1,4 @@
-package main
+package ws
 
 import (
 	"context"
@@ -7,29 +7,21 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"sync"
+
+	"github.com/michaelgov-ctrl/trie/trie"
 )
 
 type Manager struct {
 	clients  map[*Client]bool
 	mu       sync.RWMutex
 	handlers map[string]EventHandler
-	wordTrie *Trie
+	wordTrie *trie.Trie
 	logger   *slog.Logger
 }
 
-// words pulled from here:
-// https://github.com/dwyl/english-words/tree/master
-
 func NewManager(logger *slog.Logger) (*Manager, error) {
-	file, err := os.Open("words.txt")
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	trie, err := NewTrie().LoadFromFile(file)
+	trie, err := trie.NewTrie().LoadFromFile()
 	if err != nil {
 		return nil, err
 	}

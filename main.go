@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/michaelgov-ctrl/trie/ws"
 )
 
 type config struct {
@@ -14,7 +16,7 @@ type config struct {
 type application struct {
 	config  config
 	logger  *slog.Logger
-	manager *Manager
+	manager *ws.Manager
 }
 
 func main() {
@@ -23,7 +25,7 @@ func main() {
 		logger: slog.New(slog.NewTextHandler(os.Stdout, nil)),
 	}
 
-	man, err := NewManager(app.logger)
+	man, err := ws.NewManager(app.logger)
 	if err != nil {
 		app.logger.Error(err.Error())
 		os.Exit(1)
