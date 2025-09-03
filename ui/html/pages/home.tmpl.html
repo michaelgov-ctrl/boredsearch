@@ -29,7 +29,8 @@
                 hx-trigger="revealed once"
                 hx-swap="outerHTML"
                 hx-target="#more"
-                hx-include="#input">
+                hx-include="#input"
+                hx-on:htmx:after-swap="htmx.process(this)">
                 <div class='indicator'>Loading more...</div>
             </form>
         </main>

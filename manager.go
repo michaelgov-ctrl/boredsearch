@@ -108,11 +108,7 @@ func (m *Manager) searchHandler(event Event, c *Client) error {
 }
 
 func (m *Manager) search(str string, c *Client) {
-	defer c.ResetBuffer() /*func() {
-		//close(c.buffer)
-		c.buffer = make(chan string)
-		c.once.Reset()
-	}()*/
+	defer c.ResetBuffer()
 
 	if err := c.manager.wordTrie.WalkLeaves(str, c.trieWalker); err != nil {
 		if errors.Is(err, errWalkReset) {
@@ -123,6 +119,13 @@ func (m *Manager) search(str string, c *Client) {
 }
 
 func (m *Manager) moreHandler(event Event, c *Client) error {
+	/*
+		var searchEvent SearchEvent
+		if err := json.Unmarshal(event.Payload, &searchEvent); err != nil {
+			return fmt.Errorf("bad payload in request: %v", err)
+		}*/
+	fmt.Println(string(event.Payload))
+
 	c.sendMoreHTML()
 	return nil
 }

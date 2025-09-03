@@ -21,7 +21,9 @@ type SearchEvent struct {
 	Input string `json:"input"`
 }
 
-type MoreEvent struct{} // for now I need no further data
+type MoreEvent struct {
+	Input string `json:"input"`
+} // for now I need no further data
 
 type HtmxHeaders struct {
 	CurrentURL  string `json:"HX-Current-URL"`

@@ -121,8 +121,9 @@ func (c *Client) trieWalker(key string, value any) error {
 	select {
 	case <-c.reset:
 		//c.once.Do(func() {
-		close(c.buffer)
+		//close(c.buffer)
 		//})
+		c.CloseBuffer()
 		return errWalkReset
 	case c.buffer <- key:
 		return nil
@@ -153,10 +154,15 @@ func (c *Client) sendSearchHTML(prefix string) {
 	wordsBlock := strings.Join(words, "\n")
 	html := fmt.Sprintf("<div id=\"results\" hx-swap-oob=\"innerHTML\">%s</div>\n", wordsBlock)
 
-	fmt.Println(len(words))
 	if len(words) == windowSize {
 		html += `
-				<form id="more" ws-send hx-trigger="revealed once" hx-swap="outerHTML" hx-target="#more"'>
+				<form id="more"
+					hx-ext="ws-wrap-payload"
+					ws-send
+					hx-trigger="revealed once"
+					hx-swap="outerHTML"
+					hx-target="#more"
+					hx-include="#input">
 					<div class='indicator'>Loading more...</div>
 				</form>
 				`
@@ -174,7 +180,13 @@ func (c *Client) sendMoreHTML() {
 
 	if len(words) == windowSize {
 		html += `
-				<form id="more" ws-send hx-trigger="revealed once" hx-swap="outerHTML" hx-target="#more"'>
+				<form id="more"
+					hx-ext="ws-wrap-payload"
+					ws-send
+					hx-trigger="revealed once"
+					hx-swap="outerHTML"
+					hx-target="#more"
+					hx-include="#input">
 					<div class='indicator'>Loading more...</div>
 				</form>
 				`
@@ -185,11 +197,19 @@ func (c *Client) sendMoreHTML() {
 	c.egress <- []byte(html)
 }
 
+func (c *Client) CloseBuffer() {
+	//c.mu.Lock()
+	//defer c.mu.Unlock()
+	//c.once.Do(func() {
+	close(c.buffer)
+	//})
+}
+
 func (c *Client) ResetBuffer() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.buffer = make(chan string)
-	c.once.Reset()
+	//c.once.Reset()
 }
 
 type ResettableOnce struct {
